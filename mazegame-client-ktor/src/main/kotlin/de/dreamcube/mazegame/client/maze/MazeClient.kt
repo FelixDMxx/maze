@@ -101,8 +101,8 @@ class MazeClient @JvmOverloads constructor(
      */
     private val outgoingMessages = Channel<Message>(Channel.UNLIMITED)
 
-    /** Pending strategy actions belong to this client, not to a caller-provided scope. */
-    internal val strategyScope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
+    /** Create a client-owned job only when a strategy schedules delayed work. */
+    internal val strategyScope by lazy { CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job])) }
 
     /**
      * The client command executor.
