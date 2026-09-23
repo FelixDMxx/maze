@@ -2,7 +2,7 @@
 
 This opt-in test estimates how often normal auto-trapeater retirements leave a
 retry job behind. It runs the production server with normal bait generation,
-seven moving built-in `dummy` bots, and one TCP timing probe. The automatic
+six test-only bait-seeking bots, one built-in `dummy` bot, and one TCP timing probe. The automatic
 trapeater is spawned and despawned by the production handler. Its five-minute
 minimum lifetime and random decisions use real wall-clock time.
 
@@ -25,9 +25,11 @@ short to say anything about despawn frequency:
 ./gradlew :mazegame-server-ktor:naturalTrapeaterSoak --args="--seconds=45 --sample-seconds=15"
 ```
 
-Use `--args="--help"` for options. The default workload is seven dummy bots
-plus one probe, matching roughly eight active players. The probe turns in place;
-the dummy bots move and collect baits. The game stays at 150 ms.
+Use `--args="--help"` for options. The default workload is seven moving bots
+plus one probe, matching roughly eight active players. The test-only foragers
+use the production A* pathfinder to seek visible non-trap baits; this lets traps
+accumulate for the automatic trapeater. The probe turns in place. The game stays
+at 150 ms. `--dummy-players=N` adjusts the mix without changing the total.
 
 Each run writes a timestamped directory under
 `mazegame-server-ktor/build/reports/natural-trapeater/`:
@@ -58,7 +60,7 @@ server restarts, or time-of-day patterns. Fewer than ten natural despawns are
 flagged as a weak sample. If none occur, the run cannot establish a useful
 rate; extend the duration or repeat independent runs.
 
-The built-in dummy bots are a proxy for the reported 7–8 players. Their bait
-collection rate may differ from the actual server's bots. This test measures
-normal production mechanics for this workload, not the exact two-month
-history of another server.
+The bait-seeking foragers and dummy bot are proxies for the reported 7–8 bots.
+Their bait collection and trap avoidance may differ from the actual server's
+bots. This test measures normal production mechanics for this workload, not
+the exact two-month history of another server.

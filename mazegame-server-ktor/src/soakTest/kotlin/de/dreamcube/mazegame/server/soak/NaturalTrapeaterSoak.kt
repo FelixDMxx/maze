@@ -51,7 +51,8 @@ import kotlin.math.roundToInt
 private const val USAGE = """Natural auto-trapeater soak (opt-in; not part of test/check).
 Options use --name=value:
   --seconds=3600         Real wall-clock duration; cooldowns are not accelerated
-  --players=7            Active built-in dummy bots, plus one timing probe
+  --players=7            Active bots, plus one timing probe
+  --dummy-players=1      Of those bots, how many use the built-in dummy strategy
   --sample-seconds=60    Resource/timing snapshot interval
   --output-dir=PATH      Defaults to build/reports/natural-trapeater/<timestamp>
 
@@ -62,6 +63,7 @@ and 150 ms game speed. Run on the pre-fix branch to count abandoned retry jobs.
 private data class NaturalOptions(
     val seconds: Int,
     val players: Int,
+    val dummyPlayers: Int,
     val sampleSeconds: Int,
     val outputDirectory: File
 ) {
@@ -70,22 +72,24 @@ private data class NaturalOptions(
             val values = mutableMapOf<String, String>()
             for (arg in args) {
                 val parts = arg.split('=', limit = 2)
-                require(parts.size == 2 && parts[0] in setOf("--seconds", "--players", "--sample-seconds", "--output-dir")) {
+                require(parts.size == 2 && parts[0] in setOf("--seconds", "--players", "--dummy-players", "--sample-seconds", "--output-dir")) {
                     "Unknown option '$arg'.\n$USAGE"
                 }
                 require(values.put(parts[0], parts[1]) == null) { "Duplicate option '${parts[0]}'" }
             }
             val seconds = (values["--seconds"] ?: "3600").toInt()
             val players = (values["--players"] ?: "7").toInt()
+            val dummyPlayers = (values["--dummy-players"] ?: "1").toInt()
             val sampleSeconds = (values["--sample-seconds"] ?: "60").toInt()
             require(seconds > 0) { "Duration must be positive" }
             require(players in 1..20) { "Players must be between 1 and 20" }
+            require(dummyPlayers in 0..players) { "Dummy players must be between 0 and total players" }
             require(sampleSeconds > 0) { "Sample interval must be positive" }
             val timestamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS").withZone(ZoneOffset.UTC).format(Instant.now())
             val directory = File(values["--output-dir"] ?: "build/reports/natural-trapeater/$timestamp")
             require(!directory.exists() || directory.isDirectory) { "Output path must be a directory" }
             require(!File(directory, "events.csv").exists()) { "Output directory already contains events; choose a new directory" }
-            return NaturalOptions(seconds, players, sampleSeconds, directory)
+            return NaturalOptions(seconds, players, dummyPlayers, sampleSeconds, directory)
         }
     }
 }
@@ -139,7 +143,7 @@ private suspend fun runSoak(options: NaturalOptions) {
         "started=${Instant.now()}\njava=${System.getProperty("java.runtime.version")}\n" +
             "os=${System.getProperty("os.name")} ${System.getProperty("os.arch")}\n" +
             "jvmArgs=${ManagementFactory.getRuntimeMXBean().inputArguments}\n" +
-            "seconds=${options.seconds}\nplayers=${options.players}\nsampleSeconds=${options.sampleSeconds}\n" +
+            "seconds=${options.seconds}\nplayers=${options.players}\ndummyPlayers=${options.dummyPlayers}\nsampleSeconds=${options.sampleSeconds}\n" +
             "serverSpeedMs=150\nbaitGeneration=default\nautoTrapeater=true\n"
     )
     println("OUTPUT ${options.outputDirectory.absolutePath}")
@@ -199,14 +203,15 @@ private suspend fun runSoak(options: NaturalOptions) {
         probe = Probe(port, "timingprobe")
         repeat(options.players) { index ->
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-            val client = MazeClient(MazeClientConfigurationDto("127.0.0.1", port, "dummy", false, "dummy$index"), scope)
+            val strategy = if (index < options.players - options.dummyPlayers) "soakforager" else "dummy"
+            val client = MazeClient(MazeClientConfigurationDto("127.0.0.1", port, strategy, false, "player$index"), scope)
             players.add(client to scope)
             client.start()
         }
         withTimeout(30_000) {
             while (players.any { it.first.status != ConnectionStatus.PLAYING }) delay(20)
         }
-        println("READY players=${options.players} probe=1 maxTraps=${server.maxTrapCount}")
+        println("READY foragers=${options.players - options.dummyPlayers} dummies=${options.dummyPlayers} probe=1 maxTraps=${server.maxTrapCount}")
         val deadline = started + options.seconds * 1_000_000_000L
         while (System.nanoTime() < deadline) {
             val now = System.nanoTime()
@@ -244,15 +249,16 @@ private suspend fun runSoak(options: NaturalOptions) {
         val forecastLow = if (retirementsWithJobs == 0) 0.0 else
             poissonMeanAtCdf(retirementsWithJobs - 1, 0.975) * forecastScale
         val forecastHigh = poissonMeanAtCdf(retirementsWithJobs, 0.025) * forecastScale
+        val hasCompleteLifecycle = despawns > 0 && elapsed >= 600
         val summary = """
             elapsed_seconds=$elapsed
             spawns=$spawns
             despawns=$despawns
             retirements_with_active_jobs=$retirementsWithJobs
-            projected_60_day_jobs_at_observed_rate=$forecast
-            projected_60_day_jobs_poisson_95pct_low=$forecastLow
-            projected_60_day_jobs_poisson_95pct_high=$forecastHigh
-            forecast_quality=${if (despawns < 10) "Too few natural despawns for a useful forecast" else "Sampling interval only; workload drift is not covered"}
+            projected_60_day_jobs_at_observed_rate=${if (hasCompleteLifecycle) forecast else "NA"}
+            projected_60_day_jobs_poisson_95pct_low=${if (hasCompleteLifecycle) forecastLow else "NA"}
+            projected_60_day_jobs_poisson_95pct_high=${if (hasCompleteLifecycle) forecastHigh else "NA"}
+            forecast_quality=${when { !hasCompleteLifecycle -> "No complete natural lifecycle"; despawns < 10 -> "Too few natural despawns for a useful forecast"; else -> "Sampling interval only; workload drift is not covered" }}
             forecast_assumption=Stationary spawn/despawn and player activity over 60 days.
         """.trimIndent() + "\n"
         File(options.outputDirectory, "summary.txt").writeText(summary)
