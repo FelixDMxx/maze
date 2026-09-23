@@ -79,6 +79,7 @@ val soakTest by sourceSets.creating {
     compileClasspath += sourceSets.main.get().output
     runtimeClasspath += sourceSets.main.get().output
 }
+kotlin.target.compilations.getByName(soakTest.name).associateWith(kotlin.target.compilations.getByName("main"))
 configurations[soakTest.implementationConfigurationName].extendsFrom(configurations.implementation.get())
 configurations[soakTest.runtimeOnlyConfigurationName].extendsFrom(configurations.runtimeOnly.get())
 
@@ -91,6 +92,18 @@ tasks.register<JavaExec>("trapeaterSoak") {
     workingDir = projectDir
     maxHeapSize = "512m"
     // Matches the recorded experiment; this is not a physical CPU limit.
+    jvmArgs("-XX:ActiveProcessorCount=2")
+    systemProperty("logback.configurationFile", file("src/soakTest/resources/logback-soak.xml").absolutePath)
+}
+
+tasks.register<JavaExec>("naturalTrapeaterSoak") {
+    group = "verification"
+    description = "Measures natural auto-trapeater lifecycles with bait generation and active dummy bots."
+    classpath = soakTest.runtimeClasspath
+    mainClass.set("de.dreamcube.mazegame.server.soak.NaturalTrapeaterSoakKt")
+    javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
+    workingDir = projectDir
+    maxHeapSize = "512m"
     jvmArgs("-XX:ActiveProcessorCount=2")
     systemProperty("logback.configurationFile", file("src/soakTest/resources/logback-soak.xml").absolutePath)
 }

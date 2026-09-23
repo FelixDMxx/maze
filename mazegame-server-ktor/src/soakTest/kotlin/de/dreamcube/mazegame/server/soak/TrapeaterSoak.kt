@@ -84,7 +84,7 @@ private data class Options(
 }
 
 /** Uses a dedicated thread so probe scheduling does not depend on the server's coroutine dispatcher. */
-private class Probe(port: Int, val name: String) : AutoCloseable {
+internal class Probe(port: Int, val name: String) : AutoCloseable {
     private val socket = Socket("127.0.0.1", port).also {
         it.tcpNoDelay = true
         it.soTimeout = 60_000
