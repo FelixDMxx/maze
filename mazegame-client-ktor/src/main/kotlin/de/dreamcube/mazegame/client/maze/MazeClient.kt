@@ -101,6 +101,9 @@ class MazeClient @JvmOverloads constructor(
      */
     private val outgoingMessages = Channel<Message>(Channel.UNLIMITED)
 
+    /** Pending strategy actions belong to this client, not to a caller-provided scope. */
+    internal val strategyScope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
+
     /**
      * The client command executor.
      */
@@ -223,6 +226,7 @@ class MazeClient @JvmOverloads constructor(
         if (status == ConnectionStatus.DEAD || status == ConnectionStatus.DYING) {
             return
         }
+        strategyScope.cancel()
         try {
             status = ConnectionStatus.DYING
             if (clientSide) {

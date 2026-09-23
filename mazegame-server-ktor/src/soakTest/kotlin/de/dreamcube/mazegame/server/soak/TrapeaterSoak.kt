@@ -235,6 +235,9 @@ private suspend fun runSoak(options: Options) {
         ).joinToString(",")
         out.appendText("$row\n")
         println("RESULT $row")
+        if (stage.startsWith("retired_")) {
+            check(jobs == 0) { "$jobs jobs remain active after client retirement" }
+        }
         println("LIVE_RETIRED ${retired.count { it.client.get() != null }}")
         println("ALL_PROBES " + allSamples.entries.joinToString { (probe, times) -> "${probe.name}=${times.average()}ms" })
     }
@@ -258,6 +261,7 @@ private suspend fun runSoak(options: Options) {
                 phase = "logout"
                 client.logout()
                 withTimeout(10_000) { while (client.status != ConnectionStatus.DEAD) delay(5) }
+                check(scope.isActive) { "Client shutdown cancelled the caller-provided scope" }
                 retired.add(Retired(WeakReference(client), WeakReference(scope)))
                 successfullyRetired = true
                 consecutiveFailures = 0
