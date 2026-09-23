@@ -21,6 +21,16 @@ It is capable of hosting multiple actual servers simultaneously.
 
 For more details on how to configure the server read [configuration.md](doc/configuration.md).
 
+## Performance testing
+
+Run the opt-in [trapeater retirement soak test](doc/trapeater_soak.md) to measure turn latency as disconnected bot jobs accumulate:
+
+```sh
+./gradlew :mazegame-server-ktor:trapeaterSoak
+```
+
+The guide includes a short smoke run, configurable checkpoints, and the recorded 20,000-retirement results. This experiment is separate from normal tests.
+
 ## Features
 
 Most features are configurable and optional.

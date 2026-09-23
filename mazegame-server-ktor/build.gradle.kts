@@ -73,3 +73,24 @@ tasks.withType<ShadowJar> {
 }
 
 tasks.test { useJUnitPlatform() }
+
+// Deliberately separate from test/check: this experiment creates thousands of TCP clients.
+val soakTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += sourceSets.main.get().output
+}
+configurations[soakTest.implementationConfigurationName].extendsFrom(configurations.implementation.get())
+configurations[soakTest.runtimeOnlyConfigurationName].extendsFrom(configurations.runtimeOnly.get())
+
+tasks.register<JavaExec>("trapeaterSoak") {
+    group = "verification"
+    description = "Measures turn latency as disconnected trapeater retry loops accumulate."
+    classpath = soakTest.runtimeClasspath
+    mainClass.set("de.dreamcube.mazegame.server.soak.TrapeaterSoakKt")
+    javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
+    workingDir = projectDir
+    maxHeapSize = "512m"
+    // Matches the recorded experiment; this is not a physical CPU limit.
+    jvmArgs("-XX:ActiveProcessorCount=2")
+    systemProperty("logback.configurationFile", file("src/soakTest/resources/logback-soak.xml").absolutePath)
+}
