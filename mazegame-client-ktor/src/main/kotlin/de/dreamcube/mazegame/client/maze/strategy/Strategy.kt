@@ -224,14 +224,14 @@ abstract class Strategy : NoEventListener {
         val move: Move = getNextMove()
         if (move == Move.DO_NOTHING) {
             val waitFor = max(mazeClient.gameSpeed, 10)
-            mazeClient.scope.launch {
+            mazeClient.strategyScope.launch {
                 delay(waitFor.toLong())
                 makeNextMove()
             }
         } else if (botDelayInMs == 0) {
             execute(move)
         } else {
-            mazeClient.scope.launch {
+            mazeClient.strategyScope.launch {
                 delay(botDelayInMs.toLong())
                 execute(move)
             }
