@@ -2,7 +2,7 @@
 
 This opt-in test estimates how often normal auto-trapeater retirements leave a
 retry job behind. It runs the production server with normal bait generation,
-six test-only bait-seeking bots, one built-in `dummy` bot, and one TCP timing probe. The automatic
+four test-only bait-seeking bots, three built-in `dummy` bots, and one TCP timing probe. The automatic
 trapeater is spawned and despawned by the production handler. Its five-minute
 minimum lifetime and random decisions use real wall-clock time.
 
@@ -50,6 +50,11 @@ counts in `events.csv` are values at detection, not an atomic snapshot from
 inside the server handler. A child-job count above zero after disconnect is
 the practical leak signal; the earlier idle-only soak established that this
 job is the retry loop.
+
+The runner aborts if wall time and monotonic elapsed time differ by five seconds
+or more. Sleep and large clock adjustments would make cooldowns and measured
+elapsed time incomparable. Keep the host awake for the full run; on macOS, use
+`caffeinate -i ./gradlew :mazegame-server-ktor:naturalTrapeaterSoak`.
 
 ## Interpreting a forecast
 

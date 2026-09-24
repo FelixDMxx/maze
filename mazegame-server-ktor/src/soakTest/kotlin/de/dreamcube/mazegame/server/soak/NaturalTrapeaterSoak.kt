@@ -45,6 +45,7 @@ import java.net.ServerSocket
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.roundToInt
 
@@ -52,7 +53,7 @@ private const val USAGE = """Natural auto-trapeater soak (opt-in; not part of te
 Options use --name=value:
   --seconds=3600         Real wall-clock duration; cooldowns are not accelerated
   --players=7            Active bots, plus one timing probe
-  --dummy-players=1      Of those bots, how many use the built-in dummy strategy
+  --dummy-players=3      Of those bots, how many use the built-in dummy strategy
   --sample-seconds=60    Resource/timing snapshot interval
   --output-dir=PATH      Defaults to build/reports/natural-trapeater/<timestamp>
 
@@ -79,7 +80,7 @@ private data class NaturalOptions(
             }
             val seconds = (values["--seconds"] ?: "3600").toInt()
             val players = (values["--players"] ?: "7").toInt()
-            val dummyPlayers = (values["--dummy-players"] ?: "1").toInt()
+            val dummyPlayers = (values["--dummy-players"] ?: "3").toInt()
             val sampleSeconds = (values["--sample-seconds"] ?: "60").toInt()
             require(seconds > 0) { "Duration must be positive" }
             require(players in 1..20) { "Players must be between 1 and 20" }
@@ -165,6 +166,7 @@ private suspend fun runSoak(options: NaturalOptions) {
     var despawns = 0
     var retirementsWithJobs = 0
     var active: ActiveTrapeater? = null
+    val startedWallMs = System.currentTimeMillis()
     val started = System.nanoTime()
     var lastSnapshotNs = started
     var lastCpuNs = os.processCpuTime
@@ -215,6 +217,10 @@ private suspend fun runSoak(options: NaturalOptions) {
         val deadline = started + options.seconds * 1_000_000_000L
         while (System.nanoTime() < deadline) {
             val now = System.nanoTime()
+            val clockDriftMs = (System.currentTimeMillis() - startedWallMs) - elapsedSeconds(now) * 1000
+            check(abs(clockDriftMs) < 5_000) {
+                "Wall and monotonic clocks diverged by ${clockDriftMs.toLong()} ms; this run cannot support a lifecycle-rate forecast"
+            }
             val current = server.autoTrapeaterHandler.client as? ClientWrapper
             if (active?.wrapper !== current) {
                 val departed = active
