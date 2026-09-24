@@ -172,10 +172,10 @@ private suspend fun runSoak(options: NaturalOptions) {
     var lastCpuNs = os.processCpuTime
 
     fun elapsedSeconds(now: Long): Double = (now - started) / 1e9
-    fun event(kind: String, now: Long, id: Int, lifetime: Double?, jobs: Int?) {
+    fun event(kind: String, now: Long, id: Int, lifetime: Double?, jobs: Int?, traps: Pair<Int, Int>) {
         val row = listOf(
-            kind, elapsedSeconds(now), id, lifetime ?: "", server.currentTrapCount.get(),
-            server.visibleTrapCount.get(), server.maxTrapCount, jobs ?: ""
+            kind, elapsedSeconds(now), id, lifetime ?: "", traps.first,
+            traps.second, server.maxTrapCount, jobs ?: ""
         ).joinToString(",")
         events.appendText("$row\n")
         println("EVENT $row")
@@ -226,6 +226,7 @@ private suspend fun runSoak(options: NaturalOptions) {
                 val departed = active
                 if (departed != null) {
                     despawns++
+                    val trapsAtDetection = server.currentTrapCount.get() to server.visibleTrapCount.get()
                     val departedClient = departed.wrapper.client
                     val departedScope = clientScope(departedClient)
                     val stopped = withTimeoutOrNull(10_000) {
@@ -237,11 +238,11 @@ private suspend fun runSoak(options: NaturalOptions) {
                     val jobs = childJobs(departedScope)
                     if (jobs > 0) retirementsWithJobs++
                     retired.add(RetiredTrapeater(WeakReference(departedScope)))
-                    event("despawn", now, departedClient.id, (now - departed.spawnedAtNs) / 1e9, jobs)
+                    event("despawn", now, departedClient.id, (now - departed.spawnedAtNs) / 1e9, jobs, trapsAtDetection)
                 }
                 active = current?.let { wrapper ->
                     spawns++
-                    event("spawn", now, wrapper.client.id, null, null)
+                    event("spawn", now, wrapper.client.id, null, null, server.currentTrapCount.get() to server.visibleTrapCount.get())
                     ActiveTrapeater(wrapper, now)
                 }
             }
