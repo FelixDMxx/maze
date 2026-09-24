@@ -4,7 +4,8 @@ This observation used the pre-fix client on `test/natural-trapeater-lifecycle`.
 The local production server ran at 150 ms with default bait generation, automatic
 trapeater spawning, four test-only bots seeking visible non-trap baits, three
 built-in `dummy` bots, and one TCP timing probe. Normal spawn/despawn rules and
-cooldowns were left intact.
+cooldowns were left intact. The task capped JVM heap at 512 MiB and reported
+two processors to the JVM, without physically limiting the laptop's CPU.
 
 The valid continuous segment lasted **2,346 seconds (39.1 minutes)**, through
 the sixth natural despawn. It recorded **6 despawns and 1 retired trapeater

@@ -29,7 +29,9 @@ Use `--args="--help"` for options. The default workload is seven moving bots
 plus one probe, matching roughly eight active players. The test-only foragers
 use the production A* pathfinder to seek visible non-trap baits; this lets traps
 accumulate for the automatic trapeater. The probe turns in place. The game stays
-at 150 ms. `--dummy-players=N` adjusts the mix without changing the total.
+at 150 ms. `--dummy-players=N` adjusts the mix without changing the total. The
+Gradle task caps JVM heap at 512 MiB and reports two processors to the JVM;
+`ActiveProcessorCount` does not physically cap CPU use.
 
 Each run writes a timestamped directory under
 `mazegame-server-ktor/build/reports/natural-trapeater/`:
